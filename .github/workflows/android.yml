@@ -1,0 +1,51 @@
+name: Build FongMi TV APK
+
+# 手动触发，不自动跑。对应已克隆源码 5.8.5（提交 5e191aa）：
+# JDK 21、compileSdk/targetSdk 37、minSdk 24、AGP 9.4.0、Gradle 9.7.1。
+# 注意：app/build.gradle 的 debug/release 都读 local.properties 里的
+# release 签名（storeFile/keyAlias/storePassword），且配置阶段就必须
+# 存在 local.properties，所以本 workflow 先生成一个仅供试用的签名并
+# 写出 local.properties；这不是正式发布签名，正式包以后再换用户自己的 keystore。
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Generate trial signing keystore and local.properties
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$GITHUB_WORKSPACE/trial-ci.keystore" \
+            -alias trial -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass trial1234 -keypass trial1234 \
+            -dname "CN=Trial, OU=Trial, O=Trial, L=Trial, ST=Trial, C=CN"
+          {
+            echo "sdk.dir=$ANDROID_HOME"
+            echo "storeFile=$GITHUB_WORKSPACE/trial-ci.keystore"
+            echo "keyAlias=trial"
+            echo "storePassword=trial1234"
+          } > local.properties
+
+      - name: Build mobile and leanback release APKs
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleMobileRelease assembleLeanbackRelease --stacktrace
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: fongmi-tv-apks
+          path: app/build/outputs/apk/**/release/*.apk
