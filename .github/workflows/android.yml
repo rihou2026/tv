@@ -6,6 +6,9 @@ name: Build FongMi TV APK
 # release 签名（storeFile/keyAlias/storePassword），且配置阶段就必须
 # 存在 local.properties，所以本 workflow 先生成一个仅供试用的签名并
 # 写出 local.properties；这不是正式发布签名，正式包以后再换用户自己的 keystore。
+# 2026-11-01 修订：第 1 次运行在 Set up Android SDK（v3）处失败，
+# 改用 v4 并显式装 API 37 平台与 Build-Tools 37.0.0，setup-java 也从
+# 已弃用的 v4 升到 v5。
 on:
   workflow_dispatch:
 
@@ -17,13 +20,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android 37 SDK packages
+        run: |
+          yes | sdkmanager "platform-tools" "platforms;android-37" "build-tools;37.0.0"
 
       - name: Generate trial signing keystore and local.properties
         run: |
